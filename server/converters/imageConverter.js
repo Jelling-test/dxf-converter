@@ -6,25 +6,101 @@ import { v4 as uuidv4 } from 'uuid';
 import { DxfWriter } from './dxfWriter.js';
 
 /**
- * Konverterer et billede til DXF ved hjælp af potrace vektorisering
+ * Konverterer et billede til DXF ved hjælp af edge detection og potrace vektorisering
  */
 export async function convertImageToDxf(imagePath, outputDir, options = {}) {
-  const { threshold = 128, scale = 1, invert = false } = options;
+  const { 
+    threshold = 128, 
+    scale = 1, 
+    invert = false,
+    mode = 'edge',  // 'edge' for fotos, 'threshold' for simpel grafik
+    edgeStrength = 1,
+    detail = 'medium' // 'low', 'medium', 'high'
+  } = options;
   
-  // Først konverter billede til sort/hvid PNG for potrace
   const tempPath = path.join(outputDir, `temp-${uuidv4()}.png`);
   
-  await sharp(imagePath)
-    .grayscale()
-    .threshold(threshold)
-    .negate(invert)
-    .toFile(tempPath);
+  // Hent billede dimensioner
+  const metadata = await sharp(imagePath).metadata();
+  const maxDim = 1500; // Max dimension for processering
+  
+  let pipeline = sharp(imagePath);
+  
+  // Resize hvis for stort (bevarer aspect ratio)
+  if (metadata.width > maxDim || metadata.height > maxDim) {
+    pipeline = pipeline.resize(maxDim, maxDim, { fit: 'inside' });
+  }
+  
+  // Konverter til grayscale
+  pipeline = pipeline.grayscale();
+  
+  if (mode === 'edge') {
+    // Edge detection tilgang - meget bedre til fotografier
+    // Bruger Laplacian-lignende kernel til kantdetektion
+    
+    // Detail level bestemmer blur og kernel styrke
+    const detailSettings = {
+      low: { blur: 2, kernelMultiplier: 1 },
+      medium: { blur: 1, kernelMultiplier: 1.5 },
+      high: { blur: 0.5, kernelMultiplier: 2 }
+    };
+    
+    const settings = detailSettings[detail] || detailSettings.medium;
+    
+    // Først: let blur for at reducere støj
+    if (settings.blur > 0) {
+      pipeline = pipeline.blur(settings.blur);
+    }
+    
+    // Edge detection kernel (Laplacian)
+    const k = settings.kernelMultiplier * edgeStrength;
+    pipeline = pipeline.convolve({
+      width: 3,
+      height: 3,
+      kernel: [
+        -k, -k, -k,
+        -k, 8*k, -k,
+        -k, -k, -k
+      ]
+    });
+    
+    // Normaliser og inverter (kanter bliver sorte på hvid baggrund)
+    pipeline = pipeline.normalize();
+    
+    // Threshold for at få rene linjer
+    const edgeThreshold = Math.max(20, Math.min(threshold, 200));
+    pipeline = pipeline.threshold(edgeThreshold);
+    
+    // Inverter så kanter er sorte (det potrace foretrækker)
+    if (!invert) {
+      pipeline = pipeline.negate();
+    }
+    
+  } else {
+    // Standard threshold tilgang (god til logoer, tekst, simpel grafik)
+    pipeline = pipeline.threshold(threshold);
+    if (invert) {
+      pipeline = pipeline.negate();
+    }
+  }
+  
+  await pipeline.toFile(tempPath);
   
   return new Promise((resolve, reject) => {
+    // Potrace indstillinger baseret på detail level
+    const potraceSettings = {
+      low: { turdSize: 10, optTolerance: 1, alphaMax: 1 },
+      medium: { turdSize: 4, optTolerance: 0.5, alphaMax: 1 },
+      high: { turdSize: 2, optTolerance: 0.2, alphaMax: 1.3 }
+    };
+    
+    const pSettings = potraceSettings[detail] || potraceSettings.medium;
+    
     potrace.trace(tempPath, {
-      threshold: threshold,
-      turdSize: 2,
-      optTolerance: 0.2
+      turdSize: pSettings.turdSize,
+      optTolerance: pSettings.optTolerance,
+      alphaMax: pSettings.alphaMax,
+      threshold: 128 // Billedet er allerede threshold'et
     }, (err, svg) => {
       // Ryd op i temp fil
       if (fs.existsSync(tempPath)) {

@@ -6,13 +6,16 @@ import { FileImage, Download, Loader2, Settings, Upload, X } from 'lucide-react'
 export default function ImageConverter() {
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
-  const [threshold, setThreshold] = useState(128)
+  const [threshold, setThreshold] = useState(100)
   const [scale, setScale] = useState(1)
   const [invert, setInvert] = useState(false)
+  const [mode, setMode] = useState('edge') // 'edge' for fotos, 'threshold' for grafik
+  const [detail, setDetail] = useState('high') // 'low', 'medium', 'high'
+  const [edgeStrength, setEdgeStrength] = useState(1.5)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
-  const [showSettings, setShowSettings] = useState(false)
+  const [showSettings, setShowSettings] = useState(true) // Vis settings som default
 
   const onDrop = useCallback((acceptedFiles) => {
     const selectedFile = acceptedFiles[0]
@@ -48,6 +51,9 @@ export default function ImageConverter() {
       formData.append('threshold', threshold)
       formData.append('scale', scale)
       formData.append('invert', invert)
+      formData.append('mode', mode)
+      formData.append('detail', detail)
+      formData.append('edgeStrength', edgeStrength)
 
       const response = await axios.post('/api/convert/image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -92,47 +98,119 @@ export default function ImageConverter() {
 
       {/* Indstillinger */}
       {showSettings && (
-        <div className="bg-slate-700/50 rounded-xl p-4 grid sm:grid-cols-3 gap-4">
+        <div className="bg-slate-700/50 rounded-xl p-4 space-y-4">
+          {/* Mode selector */}
           <div>
-            <label className="block text-sm text-slate-300 mb-1">
-              Threshold ({threshold})
-            </label>
-            <input
-              type="range"
-              value={threshold}
-              onChange={(e) => setThreshold(parseInt(e.target.value))}
-              min="0"
-              max="255"
-              className="w-full accent-purple-500"
-            />
-            <p className="text-xs text-slate-500 mt-1">Sort/hvid grænse</p>
+            <label className="block text-sm text-slate-300 mb-2">Konverteringstype</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMode('edge')}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  mode === 'edge'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                }`}
+              >
+                🖼️ Foto (Edge Detection)
+              </button>
+              <button
+                onClick={() => setMode('threshold')}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  mode === 'threshold'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                }`}
+              >
+                📐 Logo/Grafik (Threshold)
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              {mode === 'edge' 
+                ? 'Bedst til fotografier - finder kanter og konturer' 
+                : 'Bedst til logoer og simpel grafik'}
+            </p>
           </div>
-          <div>
-            <label className="block text-sm text-slate-300 mb-1">
-              Skala ({scale}x)
-            </label>
-            <input
-              type="range"
-              value={scale}
-              onChange={(e) => setScale(parseFloat(e.target.value))}
-              min="0.1"
-              max="10"
-              step="0.1"
-              className="w-full accent-purple-500"
-            />
-            <p className="text-xs text-slate-500 mt-1">Output størrelse</p>
-          </div>
-          <div>
-            <label className="block text-sm text-slate-300 mb-2">Inverter</label>
-            <label className="flex items-center gap-2 cursor-pointer">
+
+          <div className="grid sm:grid-cols-3 gap-4">
+            {/* Detail level - kun for edge mode */}
+            {mode === 'edge' && (
+              <div>
+                <label className="block text-sm text-slate-300 mb-1">Detaljeniveau</label>
+                <select
+                  value={detail}
+                  onChange={(e) => setDetail(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:border-purple-500"
+                >
+                  <option value="low">Lav (færre linjer)</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">Høj (flere detaljer)</option>
+                </select>
+              </div>
+            )}
+
+            {/* Edge strength - kun for edge mode */}
+            {mode === 'edge' && (
+              <div>
+                <label className="block text-sm text-slate-300 mb-1">
+                  Kant styrke ({edgeStrength.toFixed(1)})
+                </label>
+                <input
+                  type="range"
+                  value={edgeStrength}
+                  onChange={(e) => setEdgeStrength(parseFloat(e.target.value))}
+                  min="0.5"
+                  max="3"
+                  step="0.1"
+                  className="w-full accent-purple-500"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm text-slate-300 mb-1">
+                Threshold ({threshold})
+              </label>
               <input
-                type="checkbox"
-                checked={invert}
-                onChange={(e) => setInvert(e.target.checked)}
-                className="w-5 h-5 rounded bg-slate-800 border-slate-600 text-purple-500 focus:ring-purple-500"
+                type="range"
+                value={threshold}
+                onChange={(e) => setThreshold(parseInt(e.target.value))}
+                min="10"
+                max="240"
+                className="w-full accent-purple-500"
               />
-              <span className="text-sm text-slate-300">Inverter sort/hvid</span>
-            </label>
+              <p className="text-xs text-slate-500 mt-1">
+                {mode === 'edge' ? 'Kant følsomhed' : 'Sort/hvid grænse'}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-300 mb-1">
+                Skala ({scale}x)
+              </label>
+              <input
+                type="range"
+                value={scale}
+                onChange={(e) => setScale(parseFloat(e.target.value))}
+                min="0.1"
+                max="10"
+                step="0.1"
+                className="w-full accent-purple-500"
+              />
+              <p className="text-xs text-slate-500 mt-1">Output størrelse</p>
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-300 mb-2">Inverter</label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={invert}
+                  onChange={(e) => setInvert(e.target.checked)}
+                  className="w-5 h-5 rounded bg-slate-800 border-slate-600 text-purple-500 focus:ring-purple-500"
+                />
+                <span className="text-sm text-slate-300">Inverter sort/hvid</span>
+              </label>
+            </div>
           </div>
         </div>
       )}

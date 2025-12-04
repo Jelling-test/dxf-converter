@@ -52,7 +52,10 @@ app.post('/api/convert/image', upload.single('image'), async (req, res) => {
     const options = {
       threshold: parseInt(req.body.threshold) || 128,
       scale: parseFloat(req.body.scale) || 1,
-      invert: req.body.invert === 'true'
+      invert: req.body.invert === 'true',
+      mode: req.body.mode || 'edge', // 'edge' for fotos, 'threshold' for grafik
+      edgeStrength: parseFloat(req.body.edgeStrength) || 1,
+      detail: req.body.detail || 'medium' // 'low', 'medium', 'high'
     };
 
     const dxfPath = await convertImageToDxf(req.file.path, outputDir, options);
