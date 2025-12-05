@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef } from 'react'
 import { useDropzone } from 'react-dropzone'
 import axios from 'axios'
-import { Sparkles, Download, Loader2, Settings, Upload, X, RefreshCw, Eye, FileJson, Crop } from 'lucide-react'
+import { Sparkles, Download, Loader2, Settings, Upload, X, RefreshCw, Eye, FileJson, Crop, PlayCircle } from 'lucide-react'
+import StringArtGuide from './StringArtGuide'
 
 // Størrelses presets med shape info
 const SIZE_PRESETS = {
@@ -45,6 +46,10 @@ export default function StringArtConverter() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [showSettings, setShowSettings] = useState(true)
+  
+  // Guide states
+  const [showGuide, setShowGuide] = useState(false)
+  const [guideData, setGuideData] = useState(null) // { sequence, pins }
   
   // Crop states
   const [cropMode, setCropMode] = useState(false)
@@ -252,6 +257,49 @@ export default function StringArtConverter() {
     }
   }
 
+  // Åbn interaktiv guide
+  const openGuide = async () => {
+    if (!file) {
+      setError('Vælg venligst et billede')
+      return
+    }
+
+    setPreviewLoading(true)
+    setError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      formData.append('size', size)
+      formData.append('numPins', numPins)
+      formData.append('numLines', Math.min(numLines, 3000))
+      formData.append('minPinDistance', minPinDistance)
+      
+      if (cropArea) {
+        formData.append('cropX', cropArea.x)
+        formData.append('cropY', cropArea.y)
+        formData.append('cropWidth', cropArea.width)
+        formData.append('cropHeight', cropArea.height)
+      }
+
+      const response = await axios.post('/api/stringart/guide-data', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 300000
+      })
+
+      setGuideData({
+        sequence: response.data.sequence,
+        pins: response.data.pins,
+        totalLines: response.data.totalLines
+      })
+      setShowGuide(true)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Kunne ikke generere guide data')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
   const clearFile = () => {
     setFile(null)
     setOriginalPreview(null)
@@ -261,6 +309,7 @@ export default function StringArtConverter() {
     setError(null)
     setCropArea(null)
     setCropMode(false)
+    setGuideData(null)
   }
 
   const sizeConfig = SIZE_PRESETS[size]
@@ -603,7 +652,7 @@ export default function StringArtConverter() {
       </div>
 
       {/* Konverter knapper */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <button
           onClick={handleConvert}
           disabled={loading || exportingJson || !file}
@@ -617,7 +666,7 @@ export default function StringArtConverter() {
           ) : (
             <>
               <Sparkles className="w-5 h-5" />
-              Generer DXF fil
+              DXF til Laser
             </>
           )}
         </button>
@@ -635,9 +684,18 @@ export default function StringArtConverter() {
           ) : (
             <>
               <FileJson className="w-5 h-5" />
-              Eksporter Instruktioner
+              Instruktioner
             </>
           )}
+        </button>
+        
+        <button
+          onClick={openGuide}
+          disabled={loading || exportingJson || previewLoading || !file}
+          className="py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          <PlayCircle className="w-5 h-5" />
+          Interaktiv Guide
         </button>
       </div>
 
@@ -671,6 +729,16 @@ export default function StringArtConverter() {
             </a>
           </div>
         </div>
+      )}
+
+      {/* Interaktiv guide modal */}
+      {showGuide && guideData && (
+        <StringArtGuide
+          sequence={guideData.sequence}
+          pins={guideData.pins}
+          totalLines={guideData.totalLines}
+          onClose={() => setShowGuide(false)}
+        />
       )}
     </div>
   )

@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { convertImageToDxf } from './converters/imageConverter.js';
-import { generateStringArtPreviewPng, convertStringArtToDxf, exportStringArtJson } from './converters/stringArtConverter.js';
+import { generateStringArtPreview, generateStringArtPreviewPng, convertStringArtToDxf, exportStringArtJson } from './converters/stringArtConverter.js';
 import { convertTextToDxf, convertBatchTextToDxf } from './converters/textConverter.js';
 import archiver from 'archiver';
 import { v4 as uuidv4 } from 'uuid';
@@ -250,6 +250,53 @@ app.post('/api/preview/stringart', upload.single('image'), async (req, res) => {
     res.send(buffer);
   } catch (error) {
     console.error('Fejl ved string art preview:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Hent string art guide data (sekvens og pin positioner)
+app.post('/api/stringart/guide-data', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Ingen fil uploadet' });
+    }
+
+    const options = {
+      size: req.body.size || 'circle_medium',
+      numPins: parseInt(req.body.numPins) || 200,
+      numLines: parseInt(req.body.numLines) || 3000,
+      minPinDistance: parseInt(req.body.minPinDistance) || 10,
+      cropX: req.body.cropX ? parseFloat(req.body.cropX) : null,
+      cropY: req.body.cropY ? parseFloat(req.body.cropY) : null,
+      cropWidth: req.body.cropWidth ? parseFloat(req.body.cropWidth) : null,
+      cropHeight: req.body.cropHeight ? parseFloat(req.body.cropHeight) : null
+    };
+
+    console.log('Genererer guide data med options:', options);
+
+    const { svg, stats, result } = await generateStringArtPreview(req.file.path, options);
+    
+    fs.unlinkSync(req.file.path);
+    
+    // Byg sekvens fra linjer (rækkefølge af søm-numre)
+    const sequence = [];
+    if (result.lines && result.lines.length > 0) {
+      // Start med første linjes pin1
+      sequence.push(result.lines[0].pin1);
+      for (const line of result.lines) {
+        sequence.push(line.pin2);
+      }
+    }
+    
+    res.json({
+      success: true,
+      sequence,
+      pins: result.pins,
+      stats,
+      totalLines: result.lines.length
+    });
+  } catch (error) {
+    console.error('Fejl ved generering af guide data:', error);
     res.status(500).json({ error: error.message });
   }
 });

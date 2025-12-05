@@ -76,6 +76,14 @@ export class DxfWriter {
     });
   }
 
+  addText(text, x, y, height = 2.5, layer = '0') {
+    this.updateBounds(x, y);
+    this.entities.push({
+      type: 'TEXT',
+      text, x, y, height, layer
+    });
+  }
+
   generateDxf() {
     let dxf = '';
     
@@ -275,6 +283,23 @@ export class DxfWriter {
           dxf += entity.startAngle.toFixed(6) + '\n';
           dxf += '51\n';
           dxf += entity.endAngle.toFixed(6) + '\n';
+          break;
+
+        case 'TEXT':
+          dxf += '0\n';
+          dxf += 'TEXT\n';
+          dxf += '8\n';
+          dxf += entity.layer + '\n';
+          dxf += '10\n';
+          dxf += entity.x.toFixed(6) + '\n';
+          dxf += '20\n';
+          dxf += entity.y.toFixed(6) + '\n';
+          dxf += '30\n';
+          dxf += '0.0\n';
+          dxf += '40\n';
+          dxf += entity.height.toFixed(6) + '\n';
+          dxf += '1\n';
+          dxf += entity.text + '\n';
           break;
       }
     }

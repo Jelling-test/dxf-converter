@@ -524,9 +524,14 @@ export async function convertStringArtToDxf(imagePath, outputDir, options = {}) 
     dxf.addLine(0, height, 0, 0, 'FRAME');
   }
 
-  // Tilføj søm-markeringer (små cirkler)
-  for (const pin of pins) {
-    dxf.addCircle(pin.x, pin.y, 0.5, 'PINS');
+  // Tilføj søm-markeringer (små cirkler med numre)
+  const pinHoleRadius = 1.5; // Hul til søm (3mm diameter)
+  for (let i = 0; i < pins.length; i++) {
+    const pin = pins[i];
+    // Hul til søm
+    dxf.addCircle(pin.x, pin.y, pinHoleRadius, 'PIN_HOLES');
+    // Nummer ved siden af hullet
+    dxf.addText(String(i), pin.x + pinHoleRadius + 1, pin.y, 2.5, 'PIN_NUMBERS');
   }
 
   // Tilføj alle linjer
