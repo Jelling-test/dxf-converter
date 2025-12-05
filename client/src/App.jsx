@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { FileImage, Type, FileText, Download, Settings, Layers, Hash } from 'lucide-react'
+import { FileImage, Type, FileText, Download, Settings, Layers, Hash, Sparkles } from 'lucide-react'
 import ImageConverter from './components/ImageConverter'
 import TextConverter from './components/TextConverter'
 import BatchConverter from './components/BatchConverter'
+import StringArtConverter from './components/StringArtConverter'
 
 function App() {
   const [activeTab, setActiveTab] = useState('text')
@@ -10,6 +11,7 @@ function App() {
   const tabs = [
     { id: 'text', label: 'Tekst', icon: Type, description: 'Konverter tekst til DXF' },
     { id: 'image', label: 'Billede', icon: FileImage, description: 'Konverter billeder til DXF' },
+    { id: 'stringart', label: 'String Art', icon: Sparkles, description: 'Lav string art mønster' },
     { id: 'batch', label: 'Batch/Numre', icon: Hash, description: 'Generer flere DXF filer' },
   ]
 
@@ -56,6 +58,7 @@ function App() {
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-6">
           {activeTab === 'text' && <TextConverter />}
           {activeTab === 'image' && <ImageConverter />}
+          {activeTab === 'stringart' && <StringArtConverter />}
           {activeTab === 'batch' && <BatchConverter />}
         </div>
 
@@ -72,9 +75,9 @@ function App() {
             <p className="text-sm text-slate-400">Vektoriserer billeder automatisk</p>
           </div>
           <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-            <Hash className="w-8 h-8 text-green-400 mb-2" />
-            <h3 className="font-semibold text-white mb-1">Batch Generering</h3>
-            <p className="text-sm text-slate-400">Generer husnumre 1-100 eller fra fil</p>
+            <Sparkles className="w-8 h-8 text-orange-400 mb-2" />
+            <h3 className="font-semibold text-white mb-1">String Art</h3>
+            <p className="text-sm text-slate-400">Billede til string art mønster</p>
           </div>
         </div>
       </main>

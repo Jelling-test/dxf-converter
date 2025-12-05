@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { convertImageToDxf } from './converters/imageConverter.js';
+import { generateStringArtPreviewPng, convertStringArtToDxf, exportStringArtJson } from './converters/stringArtConverter.js';
 import { convertTextToDxf, convertBatchTextToDxf } from './converters/textConverter.js';
 import archiver from 'archiver';
 import { v4 as uuidv4 } from 'uuid';
@@ -42,6 +43,44 @@ const upload = multer({
 
 // API Routes
 
+// Preview billede med indstillinger (returnerer PNG)
+app.post('/api/preview/image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Ingen fil uploadet' });
+    }
+
+    const { generatePreview } = await import('./converters/imageConverter.js');
+    
+    const options = {
+      threshold: parseInt(req.body.threshold) || 128,
+      invert: req.body.invert === 'true',
+      mode: req.body.mode || 'edge',
+      edgeStrength: parseFloat(req.body.edgeStrength) || 1,
+      detail: req.body.detail || 'medium',
+      contrast: parseInt(req.body.contrast) || 20,
+      brightness: parseInt(req.body.brightness) || 0,
+      dotSize: parseInt(req.body.dotSize) || 1,
+      // Crop koordinater (i procent)
+      cropX: req.body.cropX ? parseFloat(req.body.cropX) : null,
+      cropY: req.body.cropY ? parseFloat(req.body.cropY) : null,
+      cropWidth: req.body.cropWidth ? parseFloat(req.body.cropWidth) : null,
+      cropHeight: req.body.cropHeight ? parseFloat(req.body.cropHeight) : null
+    };
+
+    const previewBuffer = await generatePreview(req.file.path, options);
+    
+    // Slet uploaded fil efter preview
+    fs.unlinkSync(req.file.path);
+    
+    res.set('Content-Type', 'image/png');
+    res.send(previewBuffer);
+  } catch (error) {
+    console.error('Fejl ved preview:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Konverter billede til DXF
 app.post('/api/convert/image', upload.single('image'), async (req, res) => {
   try {
@@ -53,9 +92,18 @@ app.post('/api/convert/image', upload.single('image'), async (req, res) => {
       threshold: parseInt(req.body.threshold) || 128,
       scale: parseFloat(req.body.scale) || 1,
       invert: req.body.invert === 'true',
-      mode: req.body.mode || 'edge', // 'edge' for fotos, 'threshold' for grafik
+      mode: req.body.mode || 'edge',
       edgeStrength: parseFloat(req.body.edgeStrength) || 1,
-      detail: req.body.detail || 'medium' // 'low', 'medium', 'high'
+      detail: req.body.detail || 'medium',
+      contrast: parseInt(req.body.contrast) || 20,
+      brightness: parseInt(req.body.brightness) || 0,
+      dotSize: parseInt(req.body.dotSize) || 1,
+      outputWidth: parseInt(req.body.outputWidth) || 100, // Output bredde i mm
+      // Crop koordinater (i procent)
+      cropX: req.body.cropX ? parseFloat(req.body.cropX) : null,
+      cropY: req.body.cropY ? parseFloat(req.body.cropY) : null,
+      cropWidth: req.body.cropWidth ? parseFloat(req.body.cropWidth) : null,
+      cropHeight: req.body.cropHeight ? parseFloat(req.body.cropHeight) : null
     };
 
     const dxfPath = await convertImageToDxf(req.file.path, outputDir, options);
@@ -165,6 +213,135 @@ app.post('/api/convert/batch', upload.single('file'), async (req, res) => {
     });
   } catch (error) {
     console.error('Fejl ved batch konvertering:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Preview string art (returnerer PNG)
+app.post('/api/preview/stringart', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Ingen fil uploadet' });
+    }
+
+    const options = {
+      size: req.body.size || 'circle_medium',
+      numPins: parseInt(req.body.numPins) || 200,
+      numLines: parseInt(req.body.numLines) || 3000,
+      lineWeight: parseFloat(req.body.lineWeight) || 1,
+      lineOpacity: parseFloat(req.body.lineOpacity) || 0.1,
+      minPinDistance: parseInt(req.body.minPinDistance) || 10,
+      earlyStopThreshold: 100,
+      // Crop koordinater
+      cropX: req.body.cropX ? parseFloat(req.body.cropX) : null,
+      cropY: req.body.cropY ? parseFloat(req.body.cropY) : null,
+      cropWidth: req.body.cropWidth ? parseFloat(req.body.cropWidth) : null,
+      cropHeight: req.body.cropHeight ? parseFloat(req.body.cropHeight) : null
+    };
+
+    console.log('Genererer string art preview med options:', options);
+
+    const { buffer, stats } = await generateStringArtPreviewPng(req.file.path, options);
+    
+    fs.unlinkSync(req.file.path);
+    
+    res.set('X-StringArt-Stats', JSON.stringify(stats));
+    res.set('Content-Type', 'image/png');
+    res.send(buffer);
+  } catch (error) {
+    console.error('Fejl ved string art preview:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Konverter billede til String Art DXF
+app.post('/api/convert/stringart', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Ingen fil uploadet' });
+    }
+
+    const options = {
+      size: req.body.size || 'circle_medium',
+      numPins: parseInt(req.body.numPins) || 200,
+      numLines: parseInt(req.body.numLines) || 3500,
+      lineWeight: parseFloat(req.body.lineWeight) || 1,
+      lineOpacity: parseFloat(req.body.lineOpacity) || 0.1,
+      minPinDistance: parseInt(req.body.minPinDistance) || 10,
+      earlyStopThreshold: parseInt(req.body.earlyStopThreshold) || 50,
+      cropX: req.body.cropX ? parseFloat(req.body.cropX) : null,
+      cropY: req.body.cropY ? parseFloat(req.body.cropY) : null,
+      cropWidth: req.body.cropWidth ? parseFloat(req.body.cropWidth) : null,
+      cropHeight: req.body.cropHeight ? parseFloat(req.body.cropHeight) : null
+    };
+
+    console.log('Genererer string art DXF med options:', options);
+
+    const result = await convertStringArtToDxf(req.file.path, outputDir, options);
+    const filename = path.basename(result.path);
+    
+    fs.unlinkSync(req.file.path);
+    
+    res.json({ 
+      success: true, 
+      filename,
+      downloadUrl: `/api/download/${filename}`,
+      stats: result.stats
+    });
+  } catch (error) {
+    console.error('Fejl ved string art konvertering:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Eksporter string art som JSON med instruktioner
+app.post('/api/export/stringart-json', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Ingen fil uploadet' });
+    }
+
+    const options = {
+      size: req.body.size || 'circle_medium',
+      numPins: parseInt(req.body.numPins) || 200,
+      numLines: parseInt(req.body.numLines) || 3500,
+      lineWeight: parseFloat(req.body.lineWeight) || 1,
+      lineOpacity: parseFloat(req.body.lineOpacity) || 0.1,
+      minPinDistance: parseInt(req.body.minPinDistance) || 10,
+      cropX: req.body.cropX ? parseFloat(req.body.cropX) : null,
+      cropY: req.body.cropY ? parseFloat(req.body.cropY) : null,
+      cropWidth: req.body.cropWidth ? parseFloat(req.body.cropWidth) : null,
+      cropHeight: req.body.cropHeight ? parseFloat(req.body.cropHeight) : null
+    };
+
+    console.log('Eksporterer string art JSON med options:', options);
+
+    const result = await exportStringArtJson(req.file.path, outputDir, options);
+    
+    fs.unlinkSync(req.file.path);
+    
+    // Opret ZIP med begge filer
+    const zipFilename = `stringart-instructions-${Date.now()}.zip`;
+    const zipPath = path.join(outputDir, zipFilename);
+    
+    const output = fs.createWriteStream(zipPath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    
+    archive.pipe(output);
+    archive.file(result.jsonPath, { name: path.basename(result.jsonPath) });
+    archive.file(result.txtPath, { name: path.basename(result.txtPath) });
+    
+    await archive.finalize();
+    await new Promise((resolve) => output.on('close', resolve));
+    
+    res.json({ 
+      success: true, 
+      filename: zipFilename,
+      downloadUrl: `/api/download/${zipFilename}`,
+      stats: result.stats
+    });
+  } catch (error) {
+    console.error('Fejl ved string art JSON eksport:', error);
     res.status(500).json({ error: error.message });
   }
 });
