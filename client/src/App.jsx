@@ -1,9 +1,12 @@
 import { useState } from 'react'
-import { FileImage, Type, FileText, Download, Settings, Layers, Hash, Sparkles } from 'lucide-react'
+import { FileImage, Type, FileText, Download, Settings, Layers, Hash, Sparkles, QrCode, Puzzle, Tag } from 'lucide-react'
 import ImageConverter from './components/ImageConverter'
 import TextConverter from './components/TextConverter'
 import BatchConverter from './components/BatchConverter'
 import StringArtConverter from './components/StringArtConverter'
+import QRCodeGenerator from './components/QRCodeGenerator'
+import PuzzleGenerator from './components/PuzzleGenerator'
+import NameTagGenerator from './components/NameTagGenerator'
 
 function App() {
   const [activeTab, setActiveTab] = useState('text')
@@ -12,7 +15,10 @@ function App() {
     { id: 'text', label: 'Tekst', icon: Type, description: 'Konverter tekst til DXF' },
     { id: 'image', label: 'Billede', icon: FileImage, description: 'Konverter billeder til DXF' },
     { id: 'stringart', label: 'String Art', icon: Sparkles, description: 'Lav string art mønster' },
-    { id: 'batch', label: 'Batch/Numre', icon: Hash, description: 'Generer flere DXF filer' },
+    { id: 'qrcode', label: 'QR-kode', icon: QrCode, description: 'Generer QR-koder' },
+    { id: 'puzzle', label: 'Puzzle', icon: Puzzle, description: 'Lav puslespil' },
+    { id: 'nametag', label: 'Navneskilt', icon: Tag, description: 'Lav navneskilte' },
+    { id: 'batch', label: 'Batch', icon: Hash, description: 'Generer flere DXF filer' },
   ]
 
   return (
@@ -59,25 +65,33 @@ function App() {
           {activeTab === 'text' && <TextConverter />}
           {activeTab === 'image' && <ImageConverter />}
           {activeTab === 'stringart' && <StringArtConverter />}
+          {activeTab === 'qrcode' && <QRCodeGenerator />}
+          {activeTab === 'puzzle' && <PuzzleGenerator />}
+          {activeTab === 'nametag' && <NameTagGenerator />}
           {activeTab === 'batch' && <BatchConverter />}
         </div>
 
         {/* Info Section */}
-        <div className="mt-8 grid md:grid-cols-3 gap-4">
+        <div className="mt-8 grid md:grid-cols-4 gap-4">
           <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
             <Type className="w-8 h-8 text-blue-400 mb-2" />
             <h3 className="font-semibold text-white mb-1">Tekst til DXF</h3>
-            <p className="text-sm text-slate-400">Single-stroke font optimeret til CNC og laser</p>
+            <p className="text-sm text-slate-400">Single-stroke font til CNC/laser</p>
           </div>
           <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
             <FileImage className="w-8 h-8 text-purple-400 mb-2" />
             <h3 className="font-semibold text-white mb-1">Billede til DXF</h3>
-            <p className="text-sm text-slate-400">Vektoriserer billeder automatisk</p>
+            <p className="text-sm text-slate-400">Vektoriserer billeder</p>
           </div>
           <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
             <Sparkles className="w-8 h-8 text-orange-400 mb-2" />
             <h3 className="font-semibold text-white mb-1">String Art</h3>
-            <p className="text-sm text-slate-400">Billede til string art mønster</p>
+            <p className="text-sm text-slate-400">Fysisk tråd-kunst</p>
+          </div>
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+            <QrCode className="w-8 h-8 text-green-400 mb-2" />
+            <h3 className="font-semibold text-white mb-1">QR-koder</h3>
+            <p className="text-sm text-slate-400">URL, WiFi, tekst, GPS</p>
           </div>
         </div>
       </main>

@@ -7,6 +7,9 @@ import { fileURLToPath } from 'url';
 import { convertImageToDxf } from './converters/imageConverter.js';
 import { generateStringArtPreview, generateStringArtPreviewPng, convertStringArtToDxf, exportStringArtJson } from './converters/stringArtConverter.js';
 import { convertTextToDxf, convertBatchTextToDxf } from './converters/textConverter.js';
+import { generateQRCodePng, convertQRCodeToDxf } from './converters/qrCodeConverter.js';
+import { generatePuzzlePreviewPng, convertPuzzleToDxf } from './converters/puzzleConverter.js';
+import { generateNametagPreviewPng, convertNametagToDxf } from './converters/nametagConverter.js';
 import archiver from 'archiver';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -403,6 +406,179 @@ app.get('/api/download/:filename', (req, res) => {
   }
   
   res.download(filepath);
+});
+
+// ==================== QR-KODE ENDPOINTS ====================
+
+// Preview QR-kode som PNG
+app.post('/api/preview/qrcode', express.json(), async (req, res) => {
+  try {
+    const { type, data, size = 400 } = req.body;
+    
+    if (!type || !data) {
+      return res.status(400).json({ error: 'Type og data er påkrævet' });
+    }
+
+    console.log(`Genererer QR-kode preview: type=${type}`);
+
+    const result = await generateQRCodePng(type, data, { size });
+    
+    res.set('Content-Type', 'image/png');
+    res.set('X-QR-Data', encodeURIComponent(result.data));
+    res.send(result.buffer);
+  } catch (error) {
+    console.error('Fejl ved QR-kode preview:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Konverter QR-kode til DXF
+app.post('/api/convert/qrcode', express.json(), async (req, res) => {
+  try {
+    const { type, data, size = 50 } = req.body;
+    
+    if (!type || !data) {
+      return res.status(400).json({ error: 'Type og data er påkrævet' });
+    }
+
+    console.log(`Konverterer QR-kode til DXF: type=${type}, size=${size}mm`);
+
+    const result = await convertQRCodeToDxf(type, data, outputDir, { size });
+    
+    res.json({
+      success: true,
+      filename: result.filename,
+      downloadUrl: `/api/download/${result.filename}`,
+      data: result.data,
+      moduleCount: result.moduleCount,
+      size: result.size
+    });
+  } catch (error) {
+    console.error('Fejl ved QR-kode konvertering:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== PUZZLE ENDPOINTS ====================
+
+// Preview puzzle
+app.post('/api/preview/puzzle', upload.single('image'), async (req, res) => {
+  try {
+    const options = {
+      width: parseInt(req.body.width) || 150,
+      height: parseInt(req.body.height) || 150,
+      cols: parseInt(req.body.cols) || 4,
+      rows: parseInt(req.body.rows) || 4,
+      tabStyle: req.body.tabStyle || 'classic'
+    };
+
+    console.log('Genererer puzzle preview:', options);
+
+    const buffer = await generatePuzzlePreviewPng(req.file?.path, options);
+    
+    if (req.file) fs.unlinkSync(req.file.path);
+    
+    res.set('Content-Type', 'image/png');
+    res.send(buffer);
+  } catch (error) {
+    console.error('Fejl ved puzzle preview:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Konverter puzzle til DXF
+app.post('/api/convert/puzzle', upload.single('image'), async (req, res) => {
+  try {
+    const options = {
+      width: parseInt(req.body.width) || 150,
+      height: parseInt(req.body.height) || 150,
+      cols: parseInt(req.body.cols) || 4,
+      rows: parseInt(req.body.rows) || 4,
+      tabStyle: req.body.tabStyle || 'classic'
+    };
+
+    console.log('Konverterer puzzle til DXF:', options);
+
+    const result = await convertPuzzleToDxf(req.file?.path, outputDir, options);
+    
+    if (req.file) fs.unlinkSync(req.file.path);
+    
+    res.json({
+      success: true,
+      filename: result.filename,
+      downloadUrl: `/api/download/${result.filename}`,
+      width: result.width,
+      height: result.height,
+      cols: result.cols,
+      rows: result.rows,
+      totalPieces: result.totalPieces
+    });
+  } catch (error) {
+    console.error('Fejl ved puzzle konvertering:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== NAMETAG ENDPOINTS ====================
+
+// Preview navneskilt
+app.post('/api/preview/nametag', express.json(), async (req, res) => {
+  try {
+    const options = {
+      text: req.body.text || 'NAVN',
+      subtitle: req.body.subtitle || '',
+      width: parseInt(req.body.width) || 80,
+      height: parseInt(req.body.height) || 30,
+      shape: req.body.shape || 'rounded',
+      holePosition: req.body.holePosition || 'left',
+      holeSize: parseFloat(req.body.holeSize) || 3,
+      fontSize: parseFloat(req.body.fontSize) || 10,
+      subtitleSize: parseFloat(req.body.subtitleSize) || 5
+    };
+
+    console.log('Genererer navneskilt preview:', options);
+
+    const buffer = await generateNametagPreviewPng(options);
+    
+    res.set('Content-Type', 'image/png');
+    res.send(buffer);
+  } catch (error) {
+    console.error('Fejl ved navneskilt preview:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Konverter navneskilt til DXF
+app.post('/api/convert/nametag', express.json(), async (req, res) => {
+  try {
+    const options = {
+      text: req.body.text || 'NAVN',
+      subtitle: req.body.subtitle || '',
+      width: parseInt(req.body.width) || 80,
+      height: parseInt(req.body.height) || 30,
+      shape: req.body.shape || 'rounded',
+      holePosition: req.body.holePosition || 'left',
+      holeSize: parseFloat(req.body.holeSize) || 3,
+      fontSize: parseFloat(req.body.fontSize) || 10,
+      subtitleSize: parseFloat(req.body.subtitleSize) || 5
+    };
+
+    console.log('Konverterer navneskilt til DXF:', options);
+
+    const result = await convertNametagToDxf(outputDir, options);
+    
+    res.json({
+      success: true,
+      filename: result.filename,
+      downloadUrl: `/api/download/${result.filename}`,
+      width: result.width,
+      height: result.height,
+      text: result.text
+    });
+  } catch (error) {
+    console.error('Fejl ved navneskilt konvertering:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Ryd op i gamle filer (kør hver time)
